@@ -181,24 +181,6 @@ Current ingestion: **650+ unique jobs per run**, **370+ Bay Area jobs**, last 15
 
 ---
 
-## Resume Positioning
-
-```
-JobRadar — AI Job Search Platform (Founder & Lead Engineer)   2026 - Present
-
-- Built multi-agent AI system processing 650+ job listings per run across 2 APIs
-- Designed embedding-based matching engine achieving precision scoring on role alignment
-- Orchestrated Airflow DAGs for end-to-end pipeline from ingestion to notification
-- Modeled analytics warehouse in BigQuery with dbt (staging → marts → reports)
-- Deployed full-stack platform (FastAPI + Next.js) on Railway with CI/CD
-- Integrated Claude AI agents for automated cover letter and resume tailoring per role
-
-Stack: Python, FastAPI, PostgreSQL, pgvector, Airflow, dbt, BigQuery, Next.js,
-       Claude AI, Docker, Railway, Prometheus, Grafana, SendGrid
-```
-
----
-
 ## Why This Project
 
 Built to solve a real problem: automating the repetitive parts of a job search while keeping humans in control of the decisions that matter (which jobs to apply to, what to say).
