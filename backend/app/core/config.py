@@ -10,6 +10,11 @@ class Settings(BaseSettings):
 
     JSEARCH_API_KEY: str
 
+    ANTHROPIC_API_KEY: str
+    VOYAGE_API_KEY: str
+    GMAIL_USER: str
+    GMAIL_APP_PASSWORD: str
+
     class Config:
         env_file = "/home/ahmadavar/projects/jobradar/.env"
 
