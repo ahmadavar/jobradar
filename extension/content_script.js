@@ -170,7 +170,65 @@ function fillWorkday() {
 
 // ── Label-based helpers (work across all Greenhouse/Lever/Ashby implementations) ──
 
-// Fill a <select> by matching its visible label text
+// Greenhouse new UI uses input[type="text"] autocomplete dropdowns — NOT <select>.
+// This function: sets value → triggers input event → waits → clicks matching option.
+function fillAutocomplete(el, value) {
+  if (!el) return;
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  el.focus();
+  el.click();
+  el.dispatchEvent(new Event('focus', { bubbles: true }));
+  setter.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+
+  setTimeout(() => {
+    // Greenhouse renders options with role="option" or common class patterns
+    const options = document.querySelectorAll(
+      '[role="option"],[class*="select__option"],[class*="dropdown-item"],[class*="option-label"],li[id*="option"]'
+    );
+    for (const opt of options) {
+      const text = opt.textContent.trim().toLowerCase();
+      if (text.includes(value.toLowerCase().split(' ')[0]) || text === value.toLowerCase()) {
+        opt.click();
+        filled++;
+        return;
+      }
+    }
+    // Fallback: commit via blur
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    filled++;
+  }, 200);
+}
+
+// Find input by label text and fill with autocomplete
+function fillAutocompleteByLabel(labelText, value) {
+  const regex = new RegExp(labelText, 'i');
+  for (const inp of document.querySelectorAll('input[type="text"],input:not([type])')) {
+    if (inp.value) continue;
+    const label =
+      document.querySelector(`label[for="${inp.id}"]`) ||
+      inp.closest('[class*="field"],[class*="question"],[class*="row"]')?.querySelector('label');
+    const text = label?.textContent || inp.getAttribute('aria-label') || inp.placeholder || '';
+    if (regex.test(text)) { fillAutocomplete(inp, value); return true; }
+  }
+  return false;
+}
+
+// Fill a plain text input by label (URLs, city — no dropdown needed)
+function fillInputByLabel(labelText, value) {
+  const regex = new RegExp(labelText, 'i');
+  for (const inp of document.querySelectorAll('input[type="text"],input[type="url"],input:not([type])')) {
+    if (inp.value) continue;
+    const label =
+      document.querySelector(`label[for="${inp.id}"]`) ||
+      inp.closest('[class*="field"],[class*="question"],[class*="row"]')?.querySelector('label');
+    const text = label?.textContent || inp.getAttribute('aria-label') || inp.placeholder || '';
+    if (regex.test(text)) { fill(inp, value); return true; }
+  }
+  return false;
+}
+
+// Fill a <select> by matching its visible label text (kept for older ATS)
 function fillSelectByLabel(labelText, optionText) {
   const regex = new RegExp(labelText, 'i');
   for (const sel of document.querySelectorAll('select')) {
@@ -178,26 +236,9 @@ function fillSelectByLabel(labelText, optionText) {
     const label =
       document.querySelector(`label[for="${sel.id}"]`) ||
       sel.closest('label') ||
-      sel.closest('[class*="field"],[class*="question"],[class*="row"],[class*="form"]')
-         ?.querySelector('label,[class*="label"]');
+      sel.closest('[class*="field"],[class*="question"],[class*="row"]')?.querySelector('label');
     const text = label?.textContent || sel.getAttribute('aria-label') || '';
     if (regex.test(text)) { selectOption(sel, optionText); return true; }
-  }
-  return false;
-}
-
-// Fill an <input> by matching its visible label text
-function fillInputByLabel(labelText, value) {
-  const regex = new RegExp(labelText, 'i');
-  for (const inp of document.querySelectorAll('input[type="text"], input[type="url"], input:not([type])')) {
-    if (inp.value) continue;
-    const label =
-      document.querySelector(`label[for="${inp.id}"]`) ||
-      inp.closest('label') ||
-      inp.closest('[class*="field"],[class*="question"],[class*="row"]')
-         ?.querySelector('label,[class*="label"]');
-    const text = label?.textContent || inp.getAttribute('aria-label') || inp.placeholder || '';
-    if (regex.test(text)) { fill(inp, value); return true; }
   }
   return false;
 }
@@ -205,55 +246,43 @@ function fillInputByLabel(labelText, value) {
 // ── Greenhouse ────────────────────────────────────────────────────────────────
 
 function fillGreenhouse() {
-  // Standard fields
-  fill(document.querySelector("#first_name"), profile.firstName);
-  fill(document.querySelector("#last_name"),  profile.lastName);
-  fill(document.querySelector("#email"),      profile.email);
-  fill(document.querySelector("#phone"),      profile.phone);
+  // Standard fields — stable IDs across all Greenhouse forms
+  fill(document.querySelector("#first_name"),        profile.firstName);
+  fill(document.querySelector("#last_name"),         profile.lastName);
+  fill(document.querySelector("#email"),             profile.email);
+  fill(document.querySelector("#phone"),             profile.phone);
+  fill(document.querySelector("#candidate-location"),profile.city);
 
-  // LinkedIn — try name/id first, then label
-  if (!tryFill(['input[name*="linkedin"]','input[placeholder*="LinkedIn"]','input[id*="linkedin"]'], profile.linkedin))
-    fillInputByLabel('linkedin', profile.linkedin);
+  // LinkedIn and Website — plain text inputs, find by label
+  fillInputByLabel("linkedin",         profile.linkedin);
+  fillInputByLabel("website|portfolio",profile.website);
+  fillInputByLabel("github",           profile.github);
 
-  // GitHub
-  tryFill(['input[name*="github"]','input[placeholder*="GitHub"]'], profile.github);
+  // Stable demographic IDs (consistent across ALL Greenhouse forms)
+  fillAutocomplete(document.querySelector("#gender"),             "Male");
+  fillAutocomplete(document.querySelector("#hispanic_ethnicity"), "No");
+  fillAutocomplete(document.querySelector("#veteran_status"),     "I am not a protected veteran");
+  fillAutocomplete(document.querySelector("#disability_status"),  "No, I don't have a disability");
 
-  // Website / portfolio
-  if (!tryFill(['input[name*="website"]','input[placeholder*="Website"]','input[placeholder*="Portfolio"]'], profile.website))
-    fillInputByLabel('website|portfolio', profile.website);
-
-  // ── All dropdowns by label text (works across every Greenhouse implementation) ──
-  const dropdowns = [
-    // Work auth
-    ["authorized to work",        "Yes"],
-    ["legal.*right to work",      "Yes"],
-    ["legally authorized",        "Yes"],
-    // Visa
-    ["visa sponsorship",          "No"],
-    ["require.*sponsor",          "No"],
-    ["sponsorship.*work",         "No"],
-    // Location
-    ["bay area",                  "Yes"],
-    ["reside.*united states",     "Yes"],
-    // Common experience yes/no questions
-    ["dbt",                       "Yes"],
-    ["dashboard",                 "Yes"],
-    // U.S. Standard demographic questions (top section)
-    ["gender identity",           "Male"],
-    ["racial.*ethnic.*background","White"],
-    ["sexual orientation",        "Prefer not to say"],
-    ["transgender",               "No"],
-    ["disability.*chronic",       "No, I don't have"],
-    ["veteran.*armed forces",     "I am not"],
-    // Voluntary Self-Identification (bottom section)
-    ["^gender",                   "Male"],
-    ["hispanic.*latino",          "No"],
-    ["veteran status",            "I am not a protected veteran"],
-    ["disability status",         "No, I do not have a disability"],
+  // Custom yes/no questions — variable IDs, match by label text
+  const autoDropdowns = [
+    ["dbt",                    "Yes"],
+    ["dashboard",              "Yes"],
+    ["bay area",               "Yes"],
+    ["authorized to work",     "Yes"],
+    ["legally authorized",     "Yes"],
+    ["visa sponsorship",       "No"],
+    ["require.*sponsor",       "No"],
+    // U.S. demographic module (numeric IDs like #4013431008)
+    ["gender identity",        "Male"],
+    ["racial.*ethnic",         "White"],
+    ["sexual orientation",     "Prefer not to say"],
+    ["transgender",            "No"],
+    ["disability.*chronic",    "No"],
+    ["veteran.*armed",         "I am not"],
   ];
-
-  for (const [label, value] of dropdowns) {
-    fillSelectByLabel(label, value);
+  for (const [label, value] of autoDropdowns) {
+    fillAutocompleteByLabel(label, value);
   }
 
   // Cover letter from clipboard
