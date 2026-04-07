@@ -227,13 +227,35 @@ function fillAshby() {
 
 // ── Uber ──────────────────────────────────────────────────────────────────────
 
-// Fill a month field by the experience/education name prefix.
-// Tries name attribute first (reliable), then falls back to [id="start/end-date-month"] by index.
-function fillMonthByName(prefix, value) {
-  const el = document.querySelector(`input[name="${prefix}.month"]`) ||
-             document.querySelector(`select[name="${prefix}.month"]`);
-  if (el) { fillMonth(el, value); return true; }
-  return false;
+// Click the month dropdown and select the matching option from Uber's listbox.
+// Falls back to native setter if no listbox found.
+function fillMonthDropdown(el, value) {
+  if (!el) return;
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+
+  // Open the dropdown
+  el.focus();
+  el.click();
+  el.dispatchEvent(new Event('focus', { bubbles: true }));
+  setter.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+
+  // Wait for listbox to render, then click the matching option
+  setTimeout(() => {
+    const options = document.querySelectorAll('[role="option"], [role="listitem"]');
+    for (const opt of options) {
+      const text = opt.textContent.trim();
+      if (text === value || text.padStart(2, '0') === value.padStart(2, '0')) {
+        opt.click();
+        filled++;
+        return;
+      }
+    }
+    // Fallback: commit via change + blur if no listbox option found
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    filled++;
+  }, 120);
 }
 
 function fillUber(sendResponse) {
@@ -246,13 +268,19 @@ function fillUber(sendResponse) {
   fill(document.querySelector('input[name="githubURL"]'),    profile.github);
   fill(document.querySelector('input[name="otherURL"]'),     profile.website);
 
-  // Zip — fill + retry after 300ms in case React resets it
+  // Zip — try multiple selectors, retry after 400ms
   const zipEl = document.querySelector('input[name="zipCode"]') ||
                 document.querySelector('input[placeholder="Zip code"]') ||
-                document.querySelector('input[placeholder*="Zip"]');
+                document.querySelector('input[placeholder*="Zip"]') ||
+                document.querySelector('input[placeholder*="zip"]') ||
+                document.querySelector('input[id*="zip"], input[id*="Zip"]') ||
+                Array.from(document.querySelectorAll('input')).find(el =>
+                  el.closest('label')?.textContent?.toLowerCase().includes('zip')
+                );
+  console.log('[JobRadar] zipEl found:', zipEl?.name, zipEl?.placeholder, zipEl?.id);
   if (zipEl) {
     fill(zipEl, profile.zip);
-    setTimeout(() => { if (zipEl.value !== profile.zip) fill(zipEl, profile.zip); }, 300);
+    setTimeout(() => fill(zipEl, profile.zip), 400);
   }
 
   // Subsidiary dropdown
@@ -276,7 +304,7 @@ function fillUber(sendResponse) {
   // ── Experience 0: LoanMatch AI (pre-existing slot) ───────────────────────
   fill(document.querySelector('input[name="experiences.0.companyName"]'), "LoanMatch AI");
   fill(document.querySelector('input[name="experiences.0.title"]'),       "Founding Engineer");
-  fill(document.querySelector('input[name="experiences.0.startDate.year"]'), "2024");
+  // year filled in Phase 2 (after month is committed)
   const exp0Current = document.querySelector('input[name="experiences.0.isCurrent"]');
   if (exp0Current && !exp0Current.checked) { exp0Current.click(); filled++; }
 
@@ -284,7 +312,7 @@ function fillUber(sendResponse) {
   fill(document.querySelector('input[name="educations.0.schoolName"]'),   "University of Bay Area");
   fill(document.querySelector('input[name="educations.0.degree"]'),       "Master of Science");
   fill(document.querySelector('input[name="educations.0.fieldOfStudy"]'), "Applied Data Science");
-  fill(document.querySelector('input[name="educations.0.startDate.year"]'), "2025");
+  // year filled in Phase 2 (after month is committed)
   const edu0Current = document.querySelector('input[name="educations.0.isCurrent"]');
   if (edu0Current && !edu0Current.checked) { edu0Current.click(); filled++; }
 
@@ -296,50 +324,43 @@ function fillUber(sendResponse) {
     for (let i = existingSlots; i < 4; i++) addExpBtn.click();
   }
 
-  // ── Fill dynamic slots after React renders them ───────────────────────────
+  // ── Phase 1 (t=1500ms): fill company/title + click all month dropdowns ──────
   setTimeout(() => {
     const allSM = document.querySelectorAll('[id="start-date-month"]');
     const allEM = document.querySelectorAll('[id="end-date-month"]');
-    console.log('[JobRadar] months found — start:', allSM.length, 'end:', allEM.length);
-    Array.from(allSM).forEach((el, i) => console.log(`  SM[${i}] tag=${el.tagName} val="${el.value}" name="${el.name}"`));
 
-    // Exp 0 start month — index [0], always force-fill
-    fillMonth(allSM[0], '06');
-
-    // Exp 1: Career Break
+    // Exp 1–3: company + title
     fill(document.querySelector('input[name="experiences.1.companyName"]'), "Career Break");
     fill(document.querySelector('input[name="experiences.1.title"]'),       "Self-directed Learning & Upskilling");
-    fillMonthByName('experiences.1.startDate', '05') ||
-      fillMonth(document.querySelectorAll('[id="start-date-month"]')[1], '05');
-    fill(document.querySelector('input[name="experiences.1.startDate.year"]'), "2023");
-    fillMonthByName('experiences.1.endDate', '06') ||
-      fillMonth(document.querySelectorAll('[id="end-date-month"]')[1], '06');
-    fill(document.querySelector('input[name="experiences.1.endDate.year"]'), "2024");
-
-    // Exp 2: Uber
     fill(document.querySelector('input[name="experiences.2.companyName"]'), "Uber");
     fill(document.querySelector('input[name="experiences.2.title"]'),       "Data Analyst (Contract)");
-    fillMonthByName('experiences.2.startDate', '01') ||
-      fillMonth(document.querySelectorAll('[id="start-date-month"]')[2], '01');
-    fill(document.querySelector('input[name="experiences.2.startDate.year"]'), "2022");
-    fillMonthByName('experiences.2.endDate', '05') ||
-      fillMonth(document.querySelectorAll('[id="end-date-month"]')[2], '05');
-    fill(document.querySelector('input[name="experiences.2.endDate.year"]'), "2023");
-
-    // Exp 3: Robert Half
     fill(document.querySelector('input[name="experiences.3.companyName"]'), "Robert Half / Marin Housing Authority");
     fill(document.querySelector('input[name="experiences.3.title"]'),       "Staff Accountant & AR/AP Specialist");
-    fillMonthByName('experiences.3.startDate', '09') ||
-      fillMonth(document.querySelectorAll('[id="start-date-month"]')[3], '09');
-    fill(document.querySelector('input[name="experiences.3.startDate.year"]'), "2019");
-    fillMonthByName('experiences.3.endDate', '08') ||
-      fillMonth(document.querySelectorAll('[id="end-date-month"]')[3], '08');
-    fill(document.querySelector('input[name="experiences.3.endDate.year"]'), "2021");
 
-    // Education 0 start month — index [4] (confirmed: 4 exp slots = indices 0-3, edu at 4)
-    fillMonth(allSM[4], '08');
+    // All months — click dropdown to properly commit selection
+    // Stagger by 150ms each so dropdowns don't overlap
+    setTimeout(() => fillMonthDropdown(allSM[0], '06'), 0);    // exp0 start
+    setTimeout(() => fillMonthDropdown(allSM[1], '05'), 150);  // exp1 start
+    setTimeout(() => fillMonthDropdown(allEM[1], '06'), 300);  // exp1 end
+    setTimeout(() => fillMonthDropdown(allSM[2], '01'), 450);  // exp2 start
+    setTimeout(() => fillMonthDropdown(allEM[2], '05'), 600);  // exp2 end
+    setTimeout(() => fillMonthDropdown(allSM[3], '09'), 750);  // exp3 start
+    setTimeout(() => fillMonthDropdown(allEM[3], '08'), 900);  // exp3 end
+    setTimeout(() => fillMonthDropdown(allSM[4], '09'), 1050); // edu0 start — September
 
-    sendResponse({ filled, ats: "Uber" });
+    // ── Phase 2 (t=1500+1400ms): fill all years AFTER months are committed ──
+    setTimeout(() => {
+      fill(document.querySelector('input[name="experiences.0.startDate.year"]'), "2024");
+      fill(document.querySelector('input[name="experiences.1.startDate.year"]'), "2023");
+      fill(document.querySelector('input[name="experiences.1.endDate.year"]'),   "2024");
+      fill(document.querySelector('input[name="experiences.2.startDate.year"]'), "2022");
+      fill(document.querySelector('input[name="experiences.2.endDate.year"]'),   "2023");
+      fill(document.querySelector('input[name="experiences.3.startDate.year"]'), "2019");
+      fill(document.querySelector('input[name="experiences.3.endDate.year"]'),   "2021");
+      fill(document.querySelector('input[name="educations.0.startDate.year"]'),  "2025");
+
+      sendResponse({ filled, ats: "Uber" });
+    }, 1400);
   }, 1500);
 }
 
