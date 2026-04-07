@@ -11,7 +11,7 @@ const profile = {
   city: "Berkeley",
   state: "CA",
   stateAbbr: "California",
-  zip: "94710",
+  zip: "94704",
   country: "United States",
   linkedin: "https://linkedin.com/in/ahmadnaggayev",
   github: "https://github.com/ahmadavar",
@@ -73,6 +73,19 @@ function clickRadio(name, value) {
 
 function fillMonth(el, value) {
   if (!el) return;
+  // Handle <select> month dropdowns
+  if (el.tagName === "SELECT") {
+    const option = Array.from(el.options).find(
+      (o) => o.value === value || o.value === String(parseInt(value)) || o.text.toLowerCase().includes(monthName(value))
+    );
+    if (option) {
+      el.value = option.value;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      filled++;
+    }
+    return;
+  }
+  // Handle <input> month fields (React-controlled)
   el.focus();
   el.dispatchEvent(new Event("focus", { bubbles: true }));
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
@@ -80,7 +93,21 @@ function fillMonth(el, value) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
   el.dispatchEvent(new Event("blur", { bubbles: true }));
+  // React sometimes resets the value — retry once after a tick
+  setTimeout(() => {
+    if (el.value !== value) {
+      setter.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
+    }
+  }, 150);
   filled++;
+}
+
+function monthName(num) {
+  const names = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  return names[parseInt(num) - 1] || "";
 }
 
 // ── ATS Detection ────────────────────────────────────────────────────────────
@@ -235,8 +262,8 @@ function fillUber(sendResponse) {
   if (addExpBtn) { addExpBtn.click(); addExpBtn.click(); addExpBtn.click(); }
 
   setTimeout(() => {
-    const startMonths = document.querySelectorAll('[id="start-date-month"]');
-    const endMonths   = document.querySelectorAll('[id="end-date-month"]');
+    const startMonths = document.querySelectorAll('[id="start-date-month"], select[name*="startMonth"], select[id*="start"][id*="month"]');
+    const endMonths   = document.querySelectorAll('[id="end-date-month"], select[name*="endMonth"], select[id*="end"][id*="month"]');
 
     fill(document.querySelector('input[name="experiences.1.companyName"]'), "Career Break");
     fill(document.querySelector('input[name="experiences.1.title"]'),       "Self-directed Learning & Upskilling");
@@ -263,7 +290,7 @@ function fillUber(sendResponse) {
     fill(document.querySelector('input[name="educations.0.startDate.year"]'), "2025");
 
     sendResponse({ filled, ats: "Uber" });
-  }, 800);
+  }, 1500);
 }
 
 // ── Generic fallback ──────────────────────────────────────────────────────────
