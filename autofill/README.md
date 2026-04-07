@@ -1,6 +1,8 @@
 # JobRadar Autofill
 
-This folder contains the current autofill solution for the final step of the JobRadar pipeline: filling out ATS job application forms after receiving a matched job via email.
+This folder contains the autofill solution for the final step of the JobRadar pipeline: filling out job application forms after receiving a matched job via email.
+
+> **ATS = Applicant Tracking System** — the software companies use to manage job applications. Every "Apply" button leads to one. Workday, Greenhouse, Lever, Uber Careers — these are all ATS portals. They all ask the same ~35 fields every time.
 
 ---
 
@@ -14,123 +16,97 @@ Job APIs → Ingestion → Embedding → Matching → Cover Letter → Email Dig
                                                               Company ATS portal (~35 manual fields)
 ```
 
-Each ATS form requires the same ~35 fields every time: work history (multiple entries), education, personal summary, demographics, visa/work authorization status, contact info. Filling these manually takes 20–25 minutes per application.
+Each ATS form asks the same data repeatedly: name, contact, work history, education, demographics, visa status. Filling manually takes 20–25 minutes per application.
 
 ---
 
-## Current Solution — JavaScript Autofill Script
+## Current Solution — Chrome Extension ✅ SHIPPED
 
-**Status: Working | Approach: Console script / Safari snippet**
+**Status: Production | Version: 1.0 | Fields filled: 40–42 on Uber, 20+ on Greenhouse**
 
-A self-contained JavaScript script (`autofill.js`) that detects the ATS platform from the URL/DOM and fills the known fields from a hardcoded profile object.
+A Chrome extension (`extension/`) that detects the ATS platform from the URL and fills all known fields with one click. No DevTools, no console, no pasting — just click the green JobRadar icon in the toolbar.
 
-### Supported Platforms
+### How to install
 
-| Platform | Fields Filled |
+1. Download or `git pull` this repo to your Mac
+2. Chrome → `chrome://extensions` → **Developer mode ON**
+3. **Load unpacked** → select the `extension/` folder
+4. Green JobRadar icon appears in your toolbar
+
+### How to update after a fix is pushed
+
+```bash
+cd ~/Downloads/jobradar-main && git pull origin main
+```
+
+Chrome → `chrome://extensions` → **↺** reload JobRadar. No reinstall needed.
+
+### Workflow per application
+
+1. Open job application page
+2. Upload your resume — wait 2–3 seconds for their parser to run
+3. Copy your cover letter from the JobRadar email digest
+4. Click the green **JobRadar** icon → **⚡ Fill This Form**
+5. Review, fix anything missed, submit
+
+---
+
+## Achievements — From Safari Console to CSP-Proof Extension
+
+### Where we started
+- Manually pasting `autofill.js` into the Safari DevTools console
+- Safari Snippets crashed on load (restricted execution context)
+- Uber's CSP blocked inline scripts entirely
+- 20–25 minutes per application, every time
+
+### What we built
+
+| Milestone | Result |
 |---|---|
-| Workday (`myworkdayjobs.com`) | Name, email, phone, city, zip, country, state, cover letter |
-| Greenhouse (`greenhouse.io`) | Name, email, phone, LinkedIn, GitHub, website, EEO dropdowns, cover letter |
-| Lever (`jobs.lever.co`) | Name, email, phone, LinkedIn, GitHub, cover letter |
-| Ashby (`ashbyhq.com`) | Name, email, phone, LinkedIn, cover letter |
-| Uber (`uber.com/careers`) | Full form: all fields including work history entries, education, all radio buttons (visa, EEO, arbitration) |
-| Generic fallback | Name, email, phone, LinkedIn, city (via `autocomplete` attributes) |
+| Safari console paste | ✅ Worked for ~20 fields on non-CSP sites |
+| Safari Snippets | ❌ Crashed — Safari's snippet context can't access React internals |
+| Uber CSP bypass via `uber-snippet.min.js` | ⚠️ Partial — worked early page load only |
+| **Chrome extension (content scripts)** | ✅ **CSP-proof — injected at browser level, no page can block it** |
+| Uber full form — 42 fields | ✅ Work history, education, EEO, radio buttons, months via dropdown click |
+| Greenhouse — label-based autocomplete | ✅ Works across all companies using Greenhouse, not just one |
+| Years filled after months | ✅ Fixed React state bug — years no longer cleared when months commit |
+| No duplicate experience slots | ✅ Counts existing slots before adding new ones |
+| Cover letter auto-paste from clipboard | ✅ Copy from email, extension pastes it automatically |
 
-### How It Works
+### Why the Chrome extension beats everything else
 
-The script uses React-compatible DOM injection (bypasses `input.value =` which React ignores) by calling the native property setter and dispatching `input`, `change`, and `blur` events. This makes React-powered ATS portals (Greenhouse, Lever, Uber) actually register the filled values.
-
-Cover letter is read from the clipboard — copy it from your JobRadar email before running the script.
-
-### Known Limitations
-
-- **CSP-blocked portals** — Custom in-house ATS portals at some large companies (Uber was eventually resolved with `uber-snippet.min.js`, but fully custom portals remain a challenge)
-- **Console requirement** — Requires opening DevTools and pasting/running the script each session. Not one-click.
-- **Static profile** — Profile data is hardcoded in the script. Changing jobs requires editing the file.
-- **Multi-page wizard forms** — Some Workday implementations span 8+ pages; the script fills page 1 only
-
-### Setup (Current)
-
-**Safari Snippet (recommended — works on all sites):**
-
-1. `Cmd+Option+I` → Sources tab → Snippets (left panel)
-2. Right-click → New Snippet → name it `autofill`
-3. Copy contents of `uber-snippet.min.js` → paste into snippet → `Cmd+S`
-4. On any job application tab: Sources → Snippets → click `autofill` → press ▶ Run
-
-**Console Paste (simpler, non-CSP-blocked sites):**
-
-1. Open any job application page
-2. `Cmd+Option+I` → Console tab
-3. Copy contents of `autofill.js` → paste → Enter
-4. For subsequent tabs: Up arrow → Enter
-
-### Workflow Per Application
-
-1. Upload resume first — let the company's parser run (2–3 seconds)
-2. Run autofill script — it corrects anything the parser got wrong
-3. Review filled fields — check name, email, phone, LinkedIn
-4. Submit
-
-> **Why upload first?** If you run the script before uploading, the company's parser fires after and overwrites your data. Always parse first, then autofill.
+| | Chrome Extension (ours) | Safari Console Paste | Simplify Copilot |
+|---|---|---|---|
+| CSP-proof | ✅ Always | ❌ Blocked on Uber, others | ✅ Yes |
+| EEO fields (race, disability, veteran) | ✅ Fully filled | ✅ Fully filled | ❌ Usually skipped |
+| Cover letter auto-paste | ✅ From clipboard | ✅ From clipboard | ❌ Not supported |
+| Work history (multiple entries) | ✅ All 4 jobs + dates | ✅ All 4 jobs + dates | ❌ Not supported |
+| One-click UX | ✅ Toolbar button | ❌ DevTools required | ✅ Extension click |
+| Privacy | ✅ Runs locally | ✅ Runs locally | ❌ Resume sent to servers |
+| Cost | ✅ Free | ✅ Free | ❌ $8–30/month |
+| Safari support | ❌ Chrome only | ✅ Yes | ❌ Chrome only |
 
 ---
 
-## Roadmap — What's Next
+## Supported Platforms
 
-The current console script approach works but has friction. The planned evolution:
-
-### Phase 6A — Profile Clipboard UI (Next.js, ~2 hrs)
-
-A page in the JobRadar dashboard that displays all 35 standard fields as click-to-copy cards. No browser injection, zero CSP risk. Works on every portal including custom-built ones.
-
-- ATS type detected from the job URL (`myworkdayjobs.com` → Workday, `greenhouse.io` → Greenhouse, etc.)
-- JobRadar email digest will include an ATS tag per job so you know which strategy to use before clicking Apply
-- One click to copy each field answer directly from the dashboard
-
-### Phase 6B — Browser Extension (longer term)
-
-Replace the console script with a proper Chrome/Firefox extension:
-
-- One-click fill button injected on supported ATS portals
-- Profile stored in extension storage (not hardcoded)
-- Automatic cover letter paste from JobRadar's latest generated letter
-- Works alongside or replaces the current script
-
-### Fallback Strategy (Available Now)
-
-For portals where no script can run (CSP-hardened custom ATS, Safari with strict policies):
-
-**Raycast Snippets (Mac, free)** — 8 trigger phrases that expand to your full answers anywhere on screen:
-
-| Trigger | Expands to |
-|---|---|
-| `;;visa` | "I am authorized to work in the US and do not require employer sponsorship." |
-| `;;summary` | Your 3-sentence professional summary |
-| `;;job1` | Most recent job: title, company, dates, bullet points |
-| `;;job2` | Second job |
-| `;;edu` | Degree, school, graduation year |
-| `;;salary` | Your target range answer |
-| `;;linkedin` | Your LinkedIn URL |
-| `;;github` | Your GitHub URL |
-
-Tab through the form, fire snippets — drops 25 min → 4–5 min even with no script running.
-
----
-
-## Why Not Just Use Simplify / SpeedyApply?
-
-| | JobRadar Autofill | Simplify / SpeedyApply |
+| Platform | Status | Fields |
 |---|---|---|
-| Safari support | ✅ Yes | ❌ Chrome only |
-| EEO fields (veteran, disability, race) | ✅ Fully filled | ❌ Usually skipped |
-| Cover letter auto-paste | ✅ From clipboard | ❌ Not supported |
-| Privacy | ✅ Runs locally, nothing uploaded | ❌ Resume sent to their servers |
-| Cost | ✅ Free | ❌ $8–30/month for pro |
-| Customizable | ✅ You own the code | ❌ No |
-| One-click UX | ❌ Console required | ✅ Extension click |
-| ATS coverage | 6 platforms + generic | 100+ platforms, battle-tested |
-
-**Recommended:** Use Simplify Copilot as a backup for its breadth, but rely on this script for EEO-heavy forms, cover letter injection, and Safari.
+| Uber (`uber.com/careers`) | ✅ Production | 42 — full form including work history, education, EEO, months |
+| Greenhouse (`greenhouse.io`) | ✅ Production | 20+ — label-based, works on any company using Greenhouse |
+| Lever (`jobs.lever.co`) | ✅ Production | Name, contact, LinkedIn, EEO dropdowns |
+| Ashby (`ashbyhq.com`) | ✅ Production | Name, contact, LinkedIn |
+| Workday (`myworkday.com`) | ✅ Production | Name, contact, city, zip, cover letter |
+| LinkedIn Easy Apply | 🔜 Next | Needs diagnostic run |
+| iCIMS | 🔜 Next | Needs diagnostic run |
+| SmartRecruiters | 🔜 Next | Needs diagnostic run |
+| Jobvite | 🔜 Backlog | |
+| Taleo / Oracle | 🔜 Backlog | |
+| Workable | 🔜 Backlog | |
+| BambooHR | 🔜 Backlog | |
+| Rippling ATS | 🔜 Backlog | |
+| Wellfound | 🔜 Backlog | |
+| Indeed Apply | 🔜 Backlog | |
 
 ---
 
@@ -152,7 +128,7 @@ document.querySelectorAll('input,textarea,select').forEach(el=>{const l=document
 
 ### Step 2 — Paste output to Claude with the ATS name
 
-Claude will identify the field patterns and add a new platform block to `extension/content_script.js` in minutes.
+Claude identifies the field patterns and adds a new platform block to `extension/content_script.js` in minutes.
 
 ### Step 3 — Pull and reload extension
 
@@ -161,25 +137,3 @@ cd ~/Downloads/jobradar-main && git pull origin main
 ```
 
 Chrome → `chrome://extensions` → **↺** reload JobRadar.
-
----
-
-### Platform status
-
-| Platform | Status | Notes |
-|---|---|---|
-| Uber | ✅ Production | 42 fields, months via dropdown click |
-| Greenhouse | ✅ Production | Label-based autocomplete, stable EEO IDs |
-| Lever | ✅ Production | Label-based |
-| Ashby | ✅ Production | Standard selectors |
-| Workday | ✅ Production | data-automation-id based |
-| LinkedIn Easy Apply | 🔜 Next | Needs diagnostic run |
-| iCIMS | 🔜 Next | Needs diagnostic run |
-| SmartRecruiters | 🔜 Next | Needs diagnostic run |
-| Jobvite | 🔜 Backlog | |
-| Taleo / Oracle | 🔜 Backlog | |
-| Workable | 🔜 Backlog | |
-| BambooHR | 🔜 Backlog | |
-| Rippling ATS | 🔜 Backlog | |
-| Wellfound | 🔜 Backlog | |
-| Indeed Apply | 🔜 Backlog | |
