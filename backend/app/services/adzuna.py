@@ -82,7 +82,7 @@ def fetch_jobs(keyword: str, where: str = "United States", page: int = 1, result
         "results_per_page": results_per_page,
         "what": keyword,
         "where": where,
-        "max_days_old": 15,
+        "max_days_old": 5,
     }
 
     try:
