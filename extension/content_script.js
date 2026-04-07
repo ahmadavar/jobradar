@@ -220,7 +220,17 @@ function fillAshby() {
 
 // ── Uber ──────────────────────────────────────────────────────────────────────
 
+// Fill a month field by the experience/education name prefix.
+// Tries name attribute first (reliable), then falls back to [id="start/end-date-month"] by index.
+function fillMonthByName(prefix, value) {
+  const el = document.querySelector(`input[name="${prefix}.month"]`) ||
+             document.querySelector(`select[name="${prefix}.month"]`);
+  if (el) { fillMonth(el, value); return true; }
+  return false;
+}
+
 function fillUber(sendResponse) {
+  // ── Basic fields ──────────────────────────────────────────────────────────
   fill(document.querySelector('input[name="firstName"]'),    profile.firstName);
   fill(document.querySelector('input[name="lastName"]'),     profile.lastName);
   fill(document.querySelector('input[name="email"]'),        profile.email);
@@ -228,9 +238,22 @@ function fillUber(sendResponse) {
   fill(document.querySelector('input[name="linkedInURL"]'),  profile.linkedin);
   fill(document.querySelector('input[name="githubURL"]'),    profile.github);
   fill(document.querySelector('input[name="otherURL"]'),     profile.website);
-  tryFill(['input[name="zipCode"]', 'input[placeholder*="zip"]'], profile.zip);
-  selectOption(document.querySelector('select[id="subsidiaryQuestion"]'), "No");
 
+  // Zip — fill + retry after 300ms in case React resets it
+  const zipEl = document.querySelector('input[name="zipCode"]') ||
+                document.querySelector('input[placeholder="Zip code"]') ||
+                document.querySelector('input[placeholder*="Zip"]');
+  if (zipEl) {
+    fill(zipEl, profile.zip);
+    setTimeout(() => { if (zipEl.value !== profile.zip) fill(zipEl, profile.zip); }, 300);
+  }
+
+  // Subsidiary dropdown
+  const subEl = document.querySelector('select[id="subsidiaryQuestion"]') ||
+                document.querySelector('select[name="subsidiaryQuestion"]');
+  if (subEl) selectOption(subEl, "No");
+
+  // ── Radio buttons ─────────────────────────────────────────────────────────
   clickRadio("driverPartnerQuestion",  "No");
   clickRadio("openRolesQuestion",      "Yes");
   clickRadio("inUSA",                  "Yes");
@@ -243,51 +266,78 @@ function fillUber(sendResponse) {
   clickRadio("sexualOrientation",      "Prefer not to say");
   clickRadio("arbitrationAgreement",   "Yes, I agree to the terms of the Arbitration Agreement.");
 
+  // ── Experience 0: LoanMatch AI (pre-existing slot) ───────────────────────
   fill(document.querySelector('input[name="experiences.0.companyName"]'), "LoanMatch AI");
   fill(document.querySelector('input[name="experiences.0.title"]'),       "Founding Engineer");
+  fill(document.querySelector('input[name="experiences.0.startDate.year"]'), "2024");
   const exp0Current = document.querySelector('input[name="experiences.0.isCurrent"]');
   if (exp0Current && !exp0Current.checked) { exp0Current.click(); filled++; }
-  const sm0 = document.querySelectorAll('[id="start-date-month"]')[0];
-  if (sm0) fillMonth(sm0, "06");
-  fill(document.querySelector('input[name="experiences.0.startDate.year"]'), "2024");
 
+  // ── Education 0: UBA (pre-existing slot) ─────────────────────────────────
   fill(document.querySelector('input[name="educations.0.schoolName"]'),   "University of Bay Area");
   fill(document.querySelector('input[name="educations.0.degree"]'),       "Master of Science");
   fill(document.querySelector('input[name="educations.0.fieldOfStudy"]'), "Applied Data Science");
+  fill(document.querySelector('input[name="educations.0.startDate.year"]'), "2025");
   const edu0Current = document.querySelector('input[name="educations.0.isCurrent"]');
   if (edu0Current && !edu0Current.checked) { edu0Current.click(); filled++; }
 
+  // ── Add only the slots we actually need — no duplicates ──────────────────
+  const existingSlots = document.querySelectorAll('input[name^="experiences."][name$=".companyName"]').length;
   const addExpBtn = Array.from(document.querySelectorAll('button'))
     .find(b => b.innerText.trim().includes('Add experience'));
-  if (addExpBtn) { addExpBtn.click(); addExpBtn.click(); addExpBtn.click(); }
+  if (addExpBtn) {
+    for (let i = existingSlots; i < 4; i++) addExpBtn.click();
+  }
 
+  // ── Fill dynamic slots after React renders them ───────────────────────────
   setTimeout(() => {
-    const startMonths = document.querySelectorAll('[id="start-date-month"], select[name*="startMonth"], select[id*="start"][id*="month"]');
-    const endMonths   = document.querySelectorAll('[id="end-date-month"], select[name*="endMonth"], select[id*="end"][id*="month"]');
+    // Exp 0 months — filled here (not earlier) so React has mounted the field
+    if (!fillMonthByName('experiences.0.startDate', '06')) {
+      const sm = document.querySelectorAll('[id="start-date-month"]')[0];
+      if (sm) fillMonth(sm, '06');
+    }
 
+    // Exp 1: Career Break
     fill(document.querySelector('input[name="experiences.1.companyName"]'), "Career Break");
     fill(document.querySelector('input[name="experiences.1.title"]'),       "Self-directed Learning & Upskilling");
-    if (startMonths[1]) fillMonth(startMonths[1], "05");
+    fillMonthByName('experiences.1.startDate', '05') ||
+      fillMonth(document.querySelectorAll('[id="start-date-month"]')[1], '05');
     fill(document.querySelector('input[name="experiences.1.startDate.year"]'), "2023");
-    if (endMonths[1]) fillMonth(endMonths[1], "06");
+    fillMonthByName('experiences.1.endDate', '06') ||
+      fillMonth(document.querySelectorAll('[id="end-date-month"]')[1], '06');
     fill(document.querySelector('input[name="experiences.1.endDate.year"]'), "2024");
 
+    // Exp 2: Uber
     fill(document.querySelector('input[name="experiences.2.companyName"]'), "Uber");
     fill(document.querySelector('input[name="experiences.2.title"]'),       "Data Analyst (Contract)");
-    if (startMonths[2]) fillMonth(startMonths[2], "01");
+    fillMonthByName('experiences.2.startDate', '01') ||
+      fillMonth(document.querySelectorAll('[id="start-date-month"]')[2], '01');
     fill(document.querySelector('input[name="experiences.2.startDate.year"]'), "2022");
-    if (endMonths[2]) fillMonth(endMonths[2], "05");
+    fillMonthByName('experiences.2.endDate', '05') ||
+      fillMonth(document.querySelectorAll('[id="end-date-month"]')[2], '05');
     fill(document.querySelector('input[name="experiences.2.endDate.year"]'), "2023");
 
+    // Exp 3: Robert Half
     fill(document.querySelector('input[name="experiences.3.companyName"]'), "Robert Half / Marin Housing Authority");
     fill(document.querySelector('input[name="experiences.3.title"]'),       "Staff Accountant & AR/AP Specialist");
-    if (startMonths[3]) fillMonth(startMonths[3], "09");
+    fillMonthByName('experiences.3.startDate', '09') ||
+      fillMonth(document.querySelectorAll('[id="start-date-month"]')[3], '09');
     fill(document.querySelector('input[name="experiences.3.startDate.year"]'), "2019");
-    if (endMonths[3]) fillMonth(endMonths[3], "08");
+    fillMonthByName('experiences.3.endDate', '08') ||
+      fillMonth(document.querySelectorAll('[id="end-date-month"]')[3], '08');
     fill(document.querySelector('input[name="experiences.3.endDate.year"]'), "2021");
 
-    if (startMonths[4]) fillMonth(startMonths[4], "08");
-    fill(document.querySelector('input[name="educations.0.startDate.year"]'), "2025");
+    // Education 0 month — by name, no DOM index guessing
+    if (!fillMonthByName('educations.0.startDate', '08')) {
+      // fallback: education start month is the one NOT inside an experiences.* container
+      const allStartMonths = document.querySelectorAll('[id="start-date-month"]');
+      const eduMonth = Array.from(allStartMonths).find(el =>
+        !el.closest('[data-experiences]') &&
+        !el.closest('input[name^="experiences"]') &&
+        allStartMonths.length > 3
+      ) || allStartMonths[4];
+      if (eduMonth) fillMonth(eduMonth, '08');
+    }
 
     sendResponse({ filled, ats: "Uber" });
   }, 1500);
