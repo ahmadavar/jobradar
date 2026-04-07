@@ -92,22 +92,21 @@ function fillMonth(el, value) {
     return;
   }
   // Handle <input> month fields (React-controlled)
+  // Always force-fill — React internal state can diverge from display value
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
   el.focus();
   el.dispatchEvent(new Event("focus", { bubbles: true }));
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
   setter.call(el, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
   el.dispatchEvent(new Event("blur", { bubbles: true }));
-  // React sometimes resets the value — retry once after a tick
+  // Retry after 200ms — React may reset the value on blur
   setTimeout(() => {
-    if (el.value !== value) {
-      setter.call(el, value);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      el.dispatchEvent(new Event("blur", { bubbles: true }));
-    }
-  }, 150);
+    setter.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+  }, 200);
   filled++;
 }
 
@@ -128,16 +127,18 @@ const isUber       = url.includes("uber.com/careers");
 // ── Listen for trigger from popup ────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action !== "fill") return;
+  if (msg.action !== "fill") return true;
 
-  filled = 0; // reset count
+  filled = 0;
 
-  if (isWorkday)    { fillWorkday();    sendResponse({ filled, ats: "Workday" }); }
-  else if (isGreenhouse) { fillGreenhouse(); sendResponse({ filled, ats: "Greenhouse" }); }
-  else if (isLever)      { fillLever();      sendResponse({ filled, ats: "Lever" }); }
-  else if (isAshby)      { fillAshby();      sendResponse({ filled, ats: "Ashby" }); }
-  else if (isUber)       { fillUber(sendResponse); } // async — responds inside setTimeout
-  else                   { fillGeneric();    sendResponse({ filled, ats: "Generic" }); }
+  if (isWorkday)         { fillWorkday();         sendResponse({ filled, ats: "Workday" }); }
+  else if (isGreenhouse) { fillGreenhouse();       sendResponse({ filled, ats: "Greenhouse" }); }
+  else if (isLever)      { fillLever();            sendResponse({ filled, ats: "Lever" }); }
+  else if (isAshby)      { fillAshby();            sendResponse({ filled, ats: "Ashby" }); }
+  else if (isUber)       { fillUber(sendResponse); } // async — sendResponse called inside setTimeout
+  else                   { fillGeneric();          sendResponse({ filled, ats: "Generic" }); }
+
+  return true; // keep message channel open for async sendResponse
 });
 
 // ── Workday ───────────────────────────────────────────────────────────────────
@@ -297,18 +298,13 @@ function fillUber(sendResponse) {
 
   // ── Fill dynamic slots after React renders them ───────────────────────────
   setTimeout(() => {
-    // Diagnostic — remove after months are confirmed working
     const allSM = document.querySelectorAll('[id="start-date-month"]');
     const allEM = document.querySelectorAll('[id="end-date-month"]');
-    console.log('[JobRadar] start-date-month elements:', allSM.length, Array.from(allSM).map((el,i) => `[${i}] tag=${el.tagName} name=${el.name} val=${el.value}`));
-    console.log('[JobRadar] end-date-month elements:', allEM.length, Array.from(allEM).map((el,i) => `[${i}] tag=${el.tagName} name=${el.name} val=${el.value}`));
-    console.log('[JobRadar] edu month by name:', document.querySelector('input[name="educations.0.startDate.month"]'), document.querySelector('select[name="educations.0.startDate.month"]'));
+    console.log('[JobRadar] months found — start:', allSM.length, 'end:', allEM.length);
+    Array.from(allSM).forEach((el, i) => console.log(`  SM[${i}] tag=${el.tagName} val="${el.value}" name="${el.name}"`));
 
-    // Exp 0 months — filled here (not earlier) so React has mounted the field
-    if (!fillMonthByName('experiences.0.startDate', '06')) {
-      const sm = document.querySelectorAll('[id="start-date-month"]')[0];
-      if (sm) fillMonth(sm, '06');
-    }
+    // Exp 0 start month — index [0], always force-fill
+    fillMonth(allSM[0], '06');
 
     // Exp 1: Career Break
     fill(document.querySelector('input[name="experiences.1.companyName"]'), "Career Break");
@@ -340,17 +336,8 @@ function fillUber(sendResponse) {
       fillMonth(document.querySelectorAll('[id="end-date-month"]')[3], '08');
     fill(document.querySelector('input[name="experiences.3.endDate.year"]'), "2021");
 
-    // Education 0 month — by name, no DOM index guessing
-    if (!fillMonthByName('educations.0.startDate', '08')) {
-      // fallback: education start month is the one NOT inside an experiences.* container
-      const allStartMonths = document.querySelectorAll('[id="start-date-month"]');
-      const eduMonth = Array.from(allStartMonths).find(el =>
-        !el.closest('[data-experiences]') &&
-        !el.closest('input[name^="experiences"]') &&
-        allStartMonths.length > 3
-      ) || allStartMonths[4];
-      if (eduMonth) fillMonth(eduMonth, '08');
-    }
+    // Education 0 start month — index [4] (confirmed: 4 exp slots = indices 0-3, edu at 4)
+    fillMonth(allSM[4], '08');
 
     sendResponse({ filled, ats: "Uber" });
   }, 1500);
