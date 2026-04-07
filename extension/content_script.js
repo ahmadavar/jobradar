@@ -168,25 +168,100 @@ function fillWorkday() {
   }).catch(() => {});
 }
 
+// ── Label-based helpers (work across all Greenhouse/Lever/Ashby implementations) ──
+
+// Fill a <select> by matching its visible label text
+function fillSelectByLabel(labelText, optionText) {
+  const regex = new RegExp(labelText, 'i');
+  for (const sel of document.querySelectorAll('select')) {
+    if (sel.value && sel.value !== "" && sel.value !== "Select...") continue;
+    const label =
+      document.querySelector(`label[for="${sel.id}"]`) ||
+      sel.closest('label') ||
+      sel.closest('[class*="field"],[class*="question"],[class*="row"],[class*="form"]')
+         ?.querySelector('label,[class*="label"]');
+    const text = label?.textContent || sel.getAttribute('aria-label') || '';
+    if (regex.test(text)) { selectOption(sel, optionText); return true; }
+  }
+  return false;
+}
+
+// Fill an <input> by matching its visible label text
+function fillInputByLabel(labelText, value) {
+  const regex = new RegExp(labelText, 'i');
+  for (const inp of document.querySelectorAll('input[type="text"], input[type="url"], input:not([type])')) {
+    if (inp.value) continue;
+    const label =
+      document.querySelector(`label[for="${inp.id}"]`) ||
+      inp.closest('label') ||
+      inp.closest('[class*="field"],[class*="question"],[class*="row"]')
+         ?.querySelector('label,[class*="label"]');
+    const text = label?.textContent || inp.getAttribute('aria-label') || inp.placeholder || '';
+    if (regex.test(text)) { fill(inp, value); return true; }
+  }
+  return false;
+}
+
 // ── Greenhouse ────────────────────────────────────────────────────────────────
 
 function fillGreenhouse() {
+  // Standard fields
   fill(document.querySelector("#first_name"), profile.firstName);
   fill(document.querySelector("#last_name"),  profile.lastName);
   fill(document.querySelector("#email"),      profile.email);
   fill(document.querySelector("#phone"),      profile.phone);
-  tryFill(['input[name*="linkedin"]', 'input[placeholder*="LinkedIn"]', 'input[id*="linkedin"]'], profile.linkedin);
-  tryFill(['input[name*="github"]',   'input[placeholder*="GitHub"]'],                            profile.github);
-  tryFill(['input[name*="website"]',  'input[placeholder*="Website"]', 'input[placeholder*="Portfolio"]'], profile.website);
-  selectOption(document.querySelector('select[name*="gender"]'),              "Male");
-  selectOption(document.querySelector('select[name*="veteran"]'),             "not a protected");
-  selectOption(document.querySelector('select[name*="disability"]'),          "No");
-  selectOption(document.querySelector('select[name*="race"], select[name*="ethnicity"]'), "White");
 
+  // LinkedIn — try name/id first, then label
+  if (!tryFill(['input[name*="linkedin"]','input[placeholder*="LinkedIn"]','input[id*="linkedin"]'], profile.linkedin))
+    fillInputByLabel('linkedin', profile.linkedin);
+
+  // GitHub
+  tryFill(['input[name*="github"]','input[placeholder*="GitHub"]'], profile.github);
+
+  // Website / portfolio
+  if (!tryFill(['input[name*="website"]','input[placeholder*="Website"]','input[placeholder*="Portfolio"]'], profile.website))
+    fillInputByLabel('website|portfolio', profile.website);
+
+  // ── All dropdowns by label text (works across every Greenhouse implementation) ──
+  const dropdowns = [
+    // Work auth
+    ["authorized to work",        "Yes"],
+    ["legal.*right to work",      "Yes"],
+    ["legally authorized",        "Yes"],
+    // Visa
+    ["visa sponsorship",          "No"],
+    ["require.*sponsor",          "No"],
+    ["sponsorship.*work",         "No"],
+    // Location
+    ["bay area",                  "Yes"],
+    ["reside.*united states",     "Yes"],
+    // Common experience yes/no questions
+    ["dbt",                       "Yes"],
+    ["dashboard",                 "Yes"],
+    // U.S. Standard demographic questions (top section)
+    ["gender identity",           "Male"],
+    ["racial.*ethnic.*background","White"],
+    ["sexual orientation",        "Prefer not to say"],
+    ["transgender",               "No"],
+    ["disability.*chronic",       "No, I don't have"],
+    ["veteran.*armed forces",     "I am not"],
+    // Voluntary Self-Identification (bottom section)
+    ["^gender",                   "Male"],
+    ["hispanic.*latino",          "No"],
+    ["veteran status",            "I am not a protected veteran"],
+    ["disability status",         "No, I do not have a disability"],
+  ];
+
+  for (const [label, value] of dropdowns) {
+    fillSelectByLabel(label, value);
+  }
+
+  // Cover letter from clipboard
   navigator.clipboard.readText().then((text) => {
     if (!text) return;
     const cl = document.querySelector("#cover_letter") ||
-               document.querySelector('textarea[name*="cover"]');
+               document.querySelector('textarea[name*="cover"]') ||
+               document.querySelector('textarea[placeholder*="cover"]');
     if (cl) fill(cl, text);
   }).catch(() => {});
 }
@@ -197,8 +272,18 @@ function fillLever() {
   fill(document.querySelector('input[name="name"]'),  profile.fullName);
   fill(document.querySelector('input[name="email"]'), profile.email);
   fill(document.querySelector('input[name="phone"]'), profile.phone);
-  tryFill(['input[name*="linkedin"]', 'input[placeholder*="LinkedIn"]'], profile.linkedin);
-  tryFill(['input[name*="github"]',   'input[placeholder*="GitHub"]'],   profile.github);
+  if (!tryFill(['input[name*="linkedin"]','input[placeholder*="LinkedIn"]'], profile.linkedin))
+    fillInputByLabel('linkedin', profile.linkedin);
+  tryFill(['input[name*="github"]','input[placeholder*="GitHub"]'], profile.github);
+
+  // EEO and custom dropdowns by label
+  const dropdowns = [
+    ["authorized",       "Yes"], ["visa",        "No"],
+    ["gender",           "Male"],["race|ethnic",  "White"],
+    ["hispanic",         "No"],  ["veteran",      "I am not"],
+    ["disability",       "No"],  ["orientation",  "Prefer not to say"],
+  ];
+  for (const [label, value] of dropdowns) fillSelectByLabel(label, value);
 
   navigator.clipboard.readText().then((text) => {
     if (!text) return;
