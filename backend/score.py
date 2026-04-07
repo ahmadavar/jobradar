@@ -6,9 +6,9 @@ db = SessionLocal()
 try:
     score_jobs(db)
 
-    top_jobs = get_top_matches(db, limit=20)
+    top_jobs = get_top_matches(db, limit=50)
 
-    print("\n=== TODAY'S TOP 10 MATCHES ===")
+    print("\n=== TODAY'S TOP 50 MATCHES ===")
     for i, job in enumerate(top_jobs, 1):
         print(f"{i:2}. [{job.match_score:.3f}] {job.title} @ {job.company}")
         print(f"     {job.url}")

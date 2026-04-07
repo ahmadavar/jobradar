@@ -7,13 +7,32 @@ from app.core.config import settings
 from app.services.writer import generate_cover_letter
 
 
+def detect_ats(url: str) -> str:
+    if not url: return "Other"
+    if "greenhouse.io" in url: return "Greenhouse"
+    if "lever.co" in url: return "Lever"
+    if "ashbyhq.com" in url: return "Ashby"
+    if "myworkday" in url: return "Workday"
+    if "uber.com" in url: return "Uber"
+    if "linkedin.com" in url: return "LinkedIn"
+    if "icims.com" in url: return "iCIMS"
+    if "smartrecruiters.com" in url: return "SmartRecruiters"
+    if "jobvite.com" in url: return "Jobvite"
+    if "taleo.net" in url: return "Taleo"
+    if "workable.com" in url: return "Workable"
+    return "Other"
+
 def send_digest(top_jobs: list) -> None:
     """Send daily job digest email with cover letters."""
 
     today = datetime.now().strftime("%B %d, %Y")
 
+    # Sort by ATS so user can batch-apply platform by platform
+    top_jobs = sorted(top_jobs, key=lambda j: (detect_ats(j.url), -j.match_score))
+
     print(f"Generating cover letters for {len(top_jobs)} jobs...")
     job_sections = ""
+    current_ats = None
 
     for i, job in enumerate(top_jobs, 1):
         salary = ""
@@ -24,6 +43,23 @@ def send_digest(top_jobs: list) -> None:
 
         score_pct = int(job.match_score * 100)
         location = job.location or "Remote"
+        ats = detect_ats(job.url)
+
+        # Add ATS section header when platform changes
+        if ats != current_ats:
+            current_ats = ats
+            ats_colors = {
+                "Greenhouse": "#24a148", "Lever": "#0055a5", "Workday": "#e3051b",
+                "Uber": "#000000", "Ashby": "#7c3aed", "LinkedIn": "#0077b5",
+                "iCIMS": "#f47920", "SmartRecruiters": "#00b140",
+            }
+            color = ats_colors.get(ats, "#555")
+            job_sections += f"""
+            <div style="margin: 28px 0 12px; padding: 8px 14px; background: {color}; border-radius: 6px; display: inline-block;">
+                <span style="color: white; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">
+                    {ats.upper()} — use JobRadar extension
+                </span>
+            </div>"""
 
         print(f"  [{i}/{len(top_jobs)}] Generating for {job.title} @ {job.company}...")
         why_fit, cover_letter = generate_cover_letter(job)
