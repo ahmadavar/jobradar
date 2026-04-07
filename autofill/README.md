@@ -136,13 +136,50 @@ Tab through the form, fire snippets — drops 25 min → 4–5 min even with no 
 
 ## Adding a New ATS
 
-When you hit "0 fields filled" on an unknown portal:
+### Step 1 — Run the diagnostic in Chrome Console (`Cmd+Option+J`)
+
+Open the job application page, type `allow pasting`, then paste this single line:
 
 ```javascript
-// Run in console to inspect available fields:
-document.querySelectorAll('input, textarea, select').forEach(el =>
-  console.log(el.tagName + ' | name=' + el.name + ' | id=' + el.id + ' | placeholder=' + el.placeholder)
-)
+document.querySelectorAll('input,textarea,select').forEach(el=>{const l=document.querySelector(`label[for="${el.id}"]`)||el.closest('div,li,section')?.querySelector('label,[class*="label"],[class*="question"]');const opts=el.tagName==='SELECT'?Array.from(el.options).map(o=>o.text.trim()).filter(t=>t).slice(0,5).join(' / '):'';console.log(el.tagName+'|'+el.type+'|id='+el.id+'|name='+el.name+'|ph='+el.placeholder+'|label='+(l?.textContent?.trim()?.slice(0,60)||'')+'|opts='+opts)})
 ```
 
-Paste the output into Claude with the ATS name — a new platform block can be added to `autofill.js` in minutes.
+**What it shows:**
+- `INPUT|text|id=first_name` → standard text input, fill by ID
+- `INPUT|text|id=question_123|label=LinkedIn Profile` → custom question, fill by label
+- `SELECT|...|opts=Yes / No / Prefer not to say` → standard select dropdown
+- `INPUT|text|id=gender|label=Gender` → autocomplete dropdown (Greenhouse style)
+
+### Step 2 — Paste output to Claude with the ATS name
+
+Claude will identify the field patterns and add a new platform block to `extension/content_script.js` in minutes.
+
+### Step 3 — Pull and reload extension
+
+```bash
+cd ~/Downloads/jobradar-main && git pull origin main
+```
+
+Chrome → `chrome://extensions` → **↺** reload JobRadar.
+
+---
+
+### Platform status
+
+| Platform | Status | Notes |
+|---|---|---|
+| Uber | ✅ Production | 42 fields, months via dropdown click |
+| Greenhouse | ✅ Production | Label-based autocomplete, stable EEO IDs |
+| Lever | ✅ Production | Label-based |
+| Ashby | ✅ Production | Standard selectors |
+| Workday | ✅ Production | data-automation-id based |
+| LinkedIn Easy Apply | 🔜 Next | Needs diagnostic run |
+| iCIMS | 🔜 Next | Needs diagnostic run |
+| SmartRecruiters | 🔜 Next | Needs diagnostic run |
+| Jobvite | 🔜 Backlog | |
+| Taleo / Oracle | 🔜 Backlog | |
+| Workable | 🔜 Backlog | |
+| BambooHR | 🔜 Backlog | |
+| Rippling ATS | 🔜 Backlog | |
+| Wellfound | 🔜 Backlog | |
+| Indeed Apply | 🔜 Backlog | |
