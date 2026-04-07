@@ -2,25 +2,29 @@
 
 > *Your personal recruiter that never sleeps*
 
-A multi-agent AI platform that automates the entire job search pipeline — from discovery to application-ready materials — while you focus on improving your skills.
+A multi-agent AI platform that automates the full job search pipeline — from discovery to application-ready materials — while you focus on the work that matters.
 
 **Live stack:** FastAPI · PostgreSQL · pgvector · Airflow · dbt · BigQuery · Next.js · Claude AI · Railway · Prometheus
 
 ---
 
-## What It Does
+## What's Been Built
 
 | Feature | Status |
 |---|---|
 | Job ingestion from Adzuna + JSearch (LinkedIn/Indeed) | ✅ Live — 650+ jobs/run |
-| Bay Area + USA filtering | ✅ Live |
+| Bay Area + USA geo filtering | ✅ Live |
 | Deduplication across sources | ✅ Live |
-| Resume embedding + job scoring (0-100%) | 🔄 Phase 2 |
-| Cover letter + resume bullet generation | 🔄 Phase 3 |
-| Daily email digest of top matches | 🔄 Phase 3 |
-| Application tracker (Kanban) | 🔄 Phase 5 |
+| Resume embedding + job scoring (cosine similarity, 0–100%) | ✅ Live |
+| Cover letter generation (Claude AI, per job) | ✅ Live |
+| Daily email digest of top matches | ✅ Live |
+| Autofill script (Workday, Greenhouse, Lever, Ashby, Uber) | ✅ Live — [see autofill/](autofill/) |
+| Application tracker (Kanban board) | 🔄 Phase 5 |
 | Analytics dashboard (Next.js) | 🔄 Phase 5 |
 | BigQuery warehouse + dbt models | 🔄 Phase 4 |
+| Browser extension (replace console script) | 🔄 Phase 6 |
+| ATS type detection in email notification | 🔄 Phase 6 |
+| Profile Clipboard UI (click-to-copy all 35 fields) | 🔄 Phase 6 |
 
 ---
 
@@ -36,18 +40,18 @@ A multi-agent AI platform that automates the entire job search pipeline — from
                       │
 ┌─────────────────────▼───────────────────────────────┐
 │               AGENT LAYER (Multi-Agent)             │
-│  Orchestrator (Sonnet)                              │
+│  Orchestrator (Claude Sonnet)                       │
 │    ├── Scraper Agent   — fetch + deduplicate        │
 │    ├── Matcher Agent   — embed + score vs resume    │
 │    ├── Writer Agent    — cover letters + bullets    │
-│    └── Notifier Agent  — email digest               │
+│    └── Notifier Agent  — daily email digest         │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
 │                  DATA LAYER                         │
 │  PostgreSQL (operational) + pgvector (embeddings)   │
-│  BigQuery (analytics warehouse)                     │
-│  dbt (staging → marts → reports)                    │
+│  BigQuery (analytics warehouse) — planned           │
+│  dbt (staging → marts → reports) — planned          │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
@@ -70,7 +74,7 @@ A multi-agent AI platform that automates the entire job search pipeline — from
 | AI / Agents | Claude Sonnet (orchestrator), Claude Haiku (matching, writing) |
 | Embeddings | pgvector + text-embedding-3-small |
 | Orchestration | Apache Airflow |
-| Warehouse | BigQuery + dbt |
+| Warehouse | BigQuery + dbt (planned) |
 | Frontend | Next.js 14, Tailwind CSS |
 | Infrastructure | Docker, Railway, GitHub Actions |
 | Monitoring | Prometheus, Grafana |
@@ -91,6 +95,10 @@ jobradar/
 │   └── requirements.txt
 ├── airflow/
 │   └── dags/                # 5 DAGs: ingestion, matching, prep, digest, dbt
+├── autofill/
+│   ├── autofill.js          # ATS autofill script (Workday, Greenhouse, Lever, Ashby, Uber)
+│   ├── uber-snippet.min.js  # Minified version for Safari snippets
+│   └── README.md            # Setup guide + roadmap
 ├── dbt/
 │   └── models/              # staging, marts, reports
 ├── frontend/
@@ -162,11 +170,11 @@ Base.metadata.create_all(bind=engine)
 | Phase | Description | Status |
 |---|---|---|
 | 1 — Data Foundation | PostgreSQL schema, Adzuna + JSearch APIs, ingestion pipeline | ✅ Complete |
-| 2 — Matching Engine | Resume embedding, job scoring, cosine similarity | 🔄 Next |
-| 3 — Agent Layer | 5 agents: Orchestrator, Scraper, Matcher, Writer, Notifier | ⬜ Planned |
-| 4 — dbt + BigQuery | Analytics warehouse, staging + mart models | ⬜ Planned |
-| 5 — Frontend | Dashboard, job list, application kanban, analytics | ⬜ Planned |
-| 6 — Production | Railway deployment, CI/CD, monitoring | ⬜ Planned |
+| 2 — Matching Engine | Resume embedding, job scoring, cosine similarity | ✅ Complete |
+| 3 — Agent Layer | 5 agents: Orchestrator, Scraper, Matcher, Writer, Notifier | ✅ Complete |
+| 4 — dbt + BigQuery | Analytics warehouse, staging + mart models | 🔄 Planned |
+| 5 — Frontend | Dashboard, job list, application kanban, analytics | 🔄 Planned |
+| 6 — Application Submission | Browser extension, ATS detection, Profile Clipboard UI | 🔄 Planned |
 
 ---
 
@@ -183,10 +191,12 @@ Current ingestion: **650+ unique jobs per run**, **370+ Bay Area jobs**, last 15
 
 ## Why This Project
 
-Built to solve a real problem: automating the repetitive parts of a job search while keeping humans in control of the decisions that matter (which jobs to apply to, what to say).
+Built to solve a real problem: automating the repetitive parts of a job search while keeping humans in control of the decisions that matter.
+
+The pipeline handles discovery → scoring → writing → delivery. The remaining bottleneck — filling out ATS application forms — is addressed in [autofill/](autofill/) with a current script-based approach and a roadmap toward a full browser extension.
 
 **NOT included by design:**
-- Auto-apply (ATS blocks bots, legal risk)
+- Auto-submit (ATS platforms actively block bots, legal/ethical risk)
 - Interview scheduling (requires human judgment)
 
 *Built by Ahmad Naggayev — [linkedin.com/in/ahmadnaggayev](https://linkedin.com/in/ahmadnaggayev)*

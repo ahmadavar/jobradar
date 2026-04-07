@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 260px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      padding: 16px;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .logo span { color: #4ade80; }
+
+    #fillBtn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #4ade80;
+      color: #0f0f0f;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #fillBtn:hover  { background: #22c55e; }
+    #fillBtn:active { background: #16a34a; }
+    #fillBtn:disabled { background: #374151; color: #6b7280; cursor: default; }
+
+    #status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #9ca3af;
+      min-height: 18px;
+      text-align: center;
+    }
+
+    #status.success { color: #4ade80; }
+    #status.error   { color: #f87171; }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #4b5563;
+      line-height: 1.5;
+      border-top: 1px solid #1f2937;
+      padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">Job<span>Radar</span> Autofill</div>
+
+  <button id="fillBtn">⚡ Fill This Form</button>
+
+  <div id="status"></div>
+
+  <div class="hint">
+    📋 Copy your cover letter <strong>before</strong> clicking — it will be pasted automatically.<br><br>
+    📎 Upload your resume first, then fill.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

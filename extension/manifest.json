@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "JobRadar Autofill",
+  "version": "1.0",
+  "description": "One-click autofill for job application forms — Workday, Greenhouse, Lever, Ashby, Uber, and generic ATS portals.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardRead"
+  ],
+  "host_permissions": [
+    "https://*.myworkday.com/*",
+    "https://*.myworkdayjobs.com/*",
+    "https://boards.greenhouse.io/*",
+    "https://*.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://*.ashbyhq.com/*",
+    "https://www.uber.com/careers/*",
+    "https://*.uber.com/careers/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "JobRadar — Fill This Form"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
