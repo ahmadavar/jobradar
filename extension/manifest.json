@@ -18,6 +18,22 @@
     "https://www.uber.com/careers/*",
     "https://*.uber.com/careers/*"
   ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.myworkday.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://boards.greenhouse.io/*",
+        "https://*.greenhouse.io/*",
+        "https://jobs.lever.co/*",
+        "https://*.ashbyhq.com/*",
+        "https://www.uber.com/careers/*",
+        "https://*.uber.com/careers/*"
+      ],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

@@ -10,12 +10,6 @@ btn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    // Inject the content script if not already present
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content_script.js"],
-    });
-
     // Send fill command and wait for response
     const response = await chrome.tabs.sendMessage(tab.id, { action: "fill" });
 

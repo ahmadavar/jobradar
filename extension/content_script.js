@@ -2,6 +2,12 @@
 // Injected by the extension into ATS pages. Runs in privileged context — CSP cannot block this.
 // Triggered via message from popup.js when user clicks "Fill This Form".
 
+// Guard against double-injection — only initialize once per page
+if (window.__jobRadarLoaded) {
+  // Already loaded — just re-register the message listener (handled below)
+} else {
+window.__jobRadarLoaded = true;
+
 const profile = {
   firstName: "Ahmad",
   lastName: "Naggayev",
@@ -291,6 +297,13 @@ function fillUber(sendResponse) {
 
   // ── Fill dynamic slots after React renders them ───────────────────────────
   setTimeout(() => {
+    // Diagnostic — remove after months are confirmed working
+    const allSM = document.querySelectorAll('[id="start-date-month"]');
+    const allEM = document.querySelectorAll('[id="end-date-month"]');
+    console.log('[JobRadar] start-date-month elements:', allSM.length, Array.from(allSM).map((el,i) => `[${i}] tag=${el.tagName} name=${el.name} val=${el.value}`));
+    console.log('[JobRadar] end-date-month elements:', allEM.length, Array.from(allEM).map((el,i) => `[${i}] tag=${el.tagName} name=${el.name} val=${el.value}`));
+    console.log('[JobRadar] edu month by name:', document.querySelector('input[name="educations.0.startDate.month"]'), document.querySelector('select[name="educations.0.startDate.month"]'));
+
     // Exp 0 months — filled here (not earlier) so React has mounted the field
     if (!fillMonthByName('experiences.0.startDate', '06')) {
       const sm = document.querySelectorAll('[id="start-date-month"]')[0];
@@ -363,3 +376,5 @@ function fillGeneric() {
     }
   }
 }
+
+} // end __jobRadarLoaded guard
