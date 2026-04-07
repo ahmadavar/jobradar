@@ -10,6 +10,15 @@ btn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+    // Inject content script if not already present (e.g. tab was open before extension reload)
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content_script.js"],
+    }).catch(() => {}); // ignore if already injected
+
+    // Small delay to let the script initialize
+    await new Promise(r => setTimeout(r, 100));
+
     // Send fill command and wait for response
     const response = await chrome.tabs.sendMessage(tab.id, { action: "fill" });
 
