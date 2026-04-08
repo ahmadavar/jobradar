@@ -174,46 +174,77 @@ function fillWorkday() {
 
 // ── Label-based helpers (work across all Greenhouse/Lever/Ashby implementations) ──
 
-// Greenhouse new UI uses input[type="text"] autocomplete dropdowns — NOT <select>.
-// This function: sets value → triggers input event → waits → clicks matching option.
-function fillAutocomplete(el, value) {
-  if (!el) return;
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-  el.focus();
-  el.click();
-  el.dispatchEvent(new Event('focus', { bubbles: true }));
-  setter.call(el, value);
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-
-  setTimeout(() => {
-    // Greenhouse renders options with role="option" or common class patterns
-    const options = document.querySelectorAll(
-      '[role="option"],[class*="select__option"],[class*="dropdown-item"],[class*="option-label"],li[id*="option"]'
-    );
-    for (const opt of options) {
-      const text = opt.textContent.trim().toLowerCase();
-      if (text.includes(value.toLowerCase().split(' ')[0]) || text === value.toLowerCase()) {
-        opt.click();
+// Wait for a React Select option to appear in the DOM and click it.
+// Uses MutationObserver so it works regardless of render speed.
+function clickReactSelectOption(value, timeoutMs) {
+  var target = value.toLowerCase();
+  var observer = new MutationObserver(function(mutations, obs) {
+    var options = document.querySelectorAll('[class*="select__option"],[role="option"]');
+    for (var i = 0; i < options.length; i++) {
+      var text = options[i].textContent.trim().toLowerCase();
+      if (text === target || text.startsWith(target.split(' ')[0])) {
+        options[i].click();
         filled++;
+        obs.disconnect();
         return;
       }
     }
-    // Fallback: commit via blur
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
-    filled++;
-  }, 200);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(function() { observer.disconnect(); }, timeoutMs || 1500);
 }
 
-// Find input by label text and fill with autocomplete
+// Open a React Select dropdown and click the matching option.
+// el = any element inside the react-select (e.g. the hidden input with a stable id like #gender)
+function fillAutocomplete(el, value) {
+  if (!el) return;
+  // React Select wraps inputs in a control div — click that to open the menu
+  var control = el.closest('[class*="select__control"]') ||
+                (el.parentElement && el.parentElement.closest('[class*="select__control"]'));
+  if (control) {
+    control.click();
+  } else {
+    // Fallback for non-React-Select autocompletes
+    el.focus();
+    el.click();
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    setter.call(el, value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  clickReactSelectOption(value);
+}
+
+// Find a React Select control by its label text and open + select the value.
 function fillAutocompleteByLabel(labelText, value) {
-  const regex = new RegExp(labelText, 'i');
-  for (const inp of document.querySelectorAll('input[type="text"],input:not([type])')) {
-    if (inp.value) continue;
-    const label =
-      document.querySelector(`label[for="${inp.id}"]`) ||
-      inp.closest('[class*="field"],[class*="question"],[class*="row"]')?.querySelector('label');
-    const text = label?.textContent || inp.getAttribute('aria-label') || inp.placeholder || '';
-    if (regex.test(text)) { fillAutocomplete(inp, value); return true; }
+  var regex = new RegExp(labelText, 'i');
+
+  // Search React Select controls first (class*="select__control")
+  var controls = document.querySelectorAll('[class*="select__control"]');
+  for (var i = 0; i < controls.length; i++) {
+    var control = controls[i];
+    var container = control.closest('[class*="field"],[class*="question"],[class*="row"],[class*="form"]') ||
+                    control.parentElement;
+    var label = container ? container.querySelector('label') : null;
+    var lText = label ? label.textContent.trim() : '';
+    var inp = control.querySelector('input');
+    var ariaLabel = inp ? (inp.getAttribute('aria-label') || '') : '';
+    if (regex.test(lText) || regex.test(ariaLabel)) {
+      control.click();
+      clickReactSelectOption(value);
+      return true;
+    }
+  }
+
+  // Fallback: plain text inputs (older Greenhouse / non-React-Select)
+  var inputs = document.querySelectorAll('input[type="text"],input:not([type])');
+  for (var j = 0; j < inputs.length; j++) {
+    var inp2 = inputs[j];
+    if (inp2.value) continue;
+    var lbl = document.querySelector('label[for="' + inp2.id + '"]') ||
+              (inp2.closest('[class*="field"],[class*="question"],[class*="row"]') || {}).querySelector &&
+               inp2.closest('[class*="field"],[class*="question"],[class*="row"]').querySelector('label');
+    var text = (lbl ? lbl.textContent : '') || inp2.getAttribute('aria-label') || inp2.placeholder || '';
+    if (regex.test(text)) { fillAutocomplete(inp2, value); return true; }
   }
   return false;
 }
@@ -272,6 +303,8 @@ function fillGreenhouse() {
   fillAutocomplete(document.querySelector("#disability_status"),  "No, I don't have a disability");
 
   // Custom yes/no questions — always match by label (IDs like question_XXXXXXXX change per company)
+  // Staggered: each call opens a dropdown and waits for React to render options via MutationObserver.
+  // 600ms gap ensures one dropdown closes before the next opens (prevents option collision).
   var autoDropdowns = [
     ["dbt",                       "Yes"],
     ["dashboard",                 "Yes"],
@@ -280,10 +313,9 @@ function fillGreenhouse() {
     ["legally authorized",        "Yes"],
     ["visa sponsorship",          "No"],
     ["require.*sponsor",          "No"],
-    ["reside",                    "United States"],   // "country where you currently reside"
-    ["remote.*location",          "Yes"],             // remote work question
-    ["employed by.*stripe|stripe affiliate", "No"],   // Stripe-specific
-    // U.S. demographic module (numeric IDs like #4013431008)
+    ["reside",                    "United States"],
+    ["remote.*location",          "Yes"],
+    ["employed by.*stripe|stripe affiliate", "No"],
     ["gender identity",           "Male"],
     ["racial.*ethnic",            "White"],
     ["sexual orientation",        "Prefer not to say"],
@@ -292,7 +324,9 @@ function fillGreenhouse() {
     ["veteran.*armed",            "I am not"],
   ];
   for (var i = 0; i < autoDropdowns.length; i++) {
-    fillAutocompleteByLabel(autoDropdowns[i][0], autoDropdowns[i][1]);
+    (function(label, value, delay) {
+      setTimeout(function() { fillAutocompleteByLabel(label, value); }, delay);
+    })(autoDropdowns[i][0], autoDropdowns[i][1], i * 600);
   }
 
   // Free-text custom questions — match by label, fill as plain input
