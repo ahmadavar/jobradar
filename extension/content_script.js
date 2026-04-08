@@ -19,7 +19,7 @@ const profile = {
   stateAbbr: "California",
   zip: "94704",
   country: "United States",
-  linkedin: "https://linkedin.com/in/ahmadnaggayev",
+  linkedin: "https://www.linkedin.com/in/ahmadnaggayev",
   github: "https://github.com/ahmadavar",
   website: "https://www.loanmatchai.app",
   // EEO
