@@ -10,21 +10,33 @@ btn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    // Inject content script if not already present (e.g. tab was open before extension reload)
+    // Inject content script into ALL frames (including cross-origin iframes like greenhouse.io)
     await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
+      target: { tabId: tab.id, allFrames: true },
       files: ["content_script.js"],
-    }).catch(() => {}); // ignore if already injected
+    }).catch(() => {});
 
-    // Small delay to let the script initialize
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 150));
 
-    // Send fill command and wait for response
-    const response = await chrome.tabs.sendMessage(tab.id, { action: "fill" });
+    // Call __jobRadarFill on every frame — collect all results
+    const frameResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      func: function() {
+        if (typeof window.__jobRadarFill === "function") return window.__jobRadarFill();
+        return { filled: 0, ats: "None" };
+      },
+    });
 
-    if (response && response.filled >= 0) {
+    // Pick the frame that filled the most fields
+    var best = { filled: 0, ats: "Generic" };
+    for (var i = 0; i < frameResults.length; i++) {
+      var r = frameResults[i] && frameResults[i].result;
+      if (r && r.filled > best.filled) best = r;
+    }
+
+    if (best.filled > 0) {
       status.className = "success";
-      status.textContent = `✅ ${response.filled} fields filled on ${response.ats}`;
+      status.textContent = "✅ " + best.filled + " fields filled on " + best.ats;
     } else {
       status.className = "error";
       status.textContent = "⚠️ No fields found — wrong page?";

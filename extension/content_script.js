@@ -124,21 +124,25 @@ const isLever      = url.includes("jobs.lever.co");
 const isAshby      = url.includes("ashbyhq.com");
 const isUber       = url.includes("uber.com/careers");
 
-// ── Listen for trigger from popup ────────────────────────────────────────────
+// ── Fill dispatcher (called by popup via executeScript OR legacy message) ─────
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+window.__jobRadarFill = function() {
+  return new Promise(function(resolve) {
+    filled = 0;
+    if (isWorkday)         { fillWorkday();         resolve({ filled: filled, ats: "Workday" }); }
+    else if (isGreenhouse) { fillGreenhouse();       resolve({ filled: filled, ats: "Greenhouse" }); }
+    else if (isLever)      { fillLever();            resolve({ filled: filled, ats: "Lever" }); }
+    else if (isAshby)      { fillAshby();            resolve({ filled: filled, ats: "Ashby" }); }
+    else if (isUber)       { fillUber(resolve); }
+    else                   { fillGeneric();          resolve({ filled: filled, ats: "Generic" }); }
+  });
+};
+
+// Legacy message listener (kept for backward compatibility)
+chrome.runtime.onMessage.addListener(function(msg, _sender, sendResponse) {
   if (msg.action !== "fill") return true;
-
-  filled = 0;
-
-  if (isWorkday)         { fillWorkday();         sendResponse({ filled, ats: "Workday" }); }
-  else if (isGreenhouse) { fillGreenhouse();       sendResponse({ filled, ats: "Greenhouse" }); }
-  else if (isLever)      { fillLever();            sendResponse({ filled, ats: "Lever" }); }
-  else if (isAshby)      { fillAshby();            sendResponse({ filled, ats: "Ashby" }); }
-  else if (isUber)       { fillUber(sendResponse); } // async — sendResponse called inside setTimeout
-  else                   { fillGeneric();          sendResponse({ filled, ats: "Generic" }); }
-
-  return true; // keep message channel open for async sendResponse
+  window.__jobRadarFill().then(sendResponse);
+  return true;
 });
 
 // ── Workday ───────────────────────────────────────────────────────────────────
@@ -253,6 +257,9 @@ function fillGreenhouse() {
   fill(document.querySelector("#phone"),             profile.phone);
   fill(document.querySelector("#candidate-location"),profile.city);
 
+  // Country — new Greenhouse UI uses an autocomplete input
+  fillAutocomplete(document.querySelector("#country"), "United States");
+
   // LinkedIn and Website — plain text inputs, find by label
   fillInputByLabel("linkedin",         profile.linkedin);
   fillInputByLabel("website|portfolio",profile.website);
@@ -264,26 +271,34 @@ function fillGreenhouse() {
   fillAutocomplete(document.querySelector("#veteran_status"),     "I am not a protected veteran");
   fillAutocomplete(document.querySelector("#disability_status"),  "No, I don't have a disability");
 
-  // Custom yes/no questions — variable IDs, match by label text
-  const autoDropdowns = [
-    ["dbt",                    "Yes"],
-    ["dashboard",              "Yes"],
-    ["bay area",               "Yes"],
-    ["authorized to work",     "Yes"],
-    ["legally authorized",     "Yes"],
-    ["visa sponsorship",       "No"],
-    ["require.*sponsor",       "No"],
+  // Custom yes/no questions — always match by label (IDs like question_XXXXXXXX change per company)
+  var autoDropdowns = [
+    ["dbt",                       "Yes"],
+    ["dashboard",                 "Yes"],
+    ["bay area",                  "Yes"],
+    ["authorized to work",        "Yes"],
+    ["legally authorized",        "Yes"],
+    ["visa sponsorship",          "No"],
+    ["require.*sponsor",          "No"],
+    ["reside",                    "United States"],   // "country where you currently reside"
+    ["remote.*location",          "Yes"],             // remote work question
+    ["employed by.*stripe|stripe affiliate", "No"],   // Stripe-specific
     // U.S. demographic module (numeric IDs like #4013431008)
-    ["gender identity",        "Male"],
-    ["racial.*ethnic",         "White"],
-    ["sexual orientation",     "Prefer not to say"],
-    ["transgender",            "No"],
-    ["disability.*chronic",    "No"],
-    ["veteran.*armed",         "I am not"],
+    ["gender identity",           "Male"],
+    ["racial.*ethnic",            "White"],
+    ["sexual orientation",        "Prefer not to say"],
+    ["transgender",               "No"],
+    ["disability.*chronic",       "No"],
+    ["veteran.*armed",            "I am not"],
   ];
-  for (const [label, value] of autoDropdowns) {
-    fillAutocompleteByLabel(label, value);
+  for (var i = 0; i < autoDropdowns.length; i++) {
+    fillAutocompleteByLabel(autoDropdowns[i][0], autoDropdowns[i][1]);
   }
+
+  // Free-text custom questions — match by label, fill as plain input
+  fillInputByLabel("current.*employer|previous.*employer", "LoanMatch AI");
+  fillInputByLabel("current.*job title|previous.*job title", "Founding Engineer");
+  fillInputByLabel("city.*state|in what city", profile.city + ", " + profile.state);
 
   // Cover letter from clipboard
   navigator.clipboard.readText().then((text) => {
