@@ -7,6 +7,30 @@ import httpx
 
 from app.core.config import settings
 
+MIDDLEMAN_DOMAINS = {
+    "dice.com", "ziprecruiter.com", "simplyhired.com", "careerbuilder.com",
+    "monster.com", "glassdoor.com", "joblead.com", "jobleads.com",
+    "jobrapido.com", "neuvoo.com", "talent.com", "jora.com",
+    "cwjobs.co.uk", "reed.co.uk", "totaljobs.com",
+}
+
+
+def _resolve_url(url: str) -> str:
+    """Follow Adzuna redirect to get the actual company/ATS URL."""
+    if not url:
+        return url
+    try:
+        r = httpx.head(url, follow_redirects=True, timeout=5)
+        final = str(r.url)
+        # If it landed on a middleman, try GET to follow JS redirects (best effort)
+        from urllib.parse import urlparse
+        domain = urlparse(final).netloc.lstrip("www.")
+        if any(domain.endswith(m) for m in MIDDLEMAN_DOMAINS):
+            return url  # keep original rather than a useless middleman link
+        return final
+    except Exception:
+        return url
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.adzuna.com/v1/api/jobs/us/search"
@@ -67,7 +91,7 @@ def _parse_job(raw: dict) -> dict:
         "remote": remote,
         "bay_area": bay_area,
         "description": raw.get("description", ""),
-        "url": raw.get("redirect_url", ""),
+        "url": _resolve_url(raw.get("redirect_url", "")),
         "salary_min": int(salary_min) if salary_min else None,
         "salary_max": int(salary_max) if salary_max else None,
         "posted_at": posted_at,

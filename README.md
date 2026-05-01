@@ -1,30 +1,117 @@
 # JobRadar — AI-Powered Job Search Platform
 
-> *Your personal recruiter that never sleeps*
+> *From job posting to submitted application in under 3 minutes.*
 
-A multi-agent AI platform that automates the full job search pipeline — from discovery to application-ready materials — while you focus on the work that matters.
+JobRadar is a multi-agent AI platform that automates every step of the job search pipeline — discovery, scoring, cover letter writing, and form filling — so you spend your time applying, not preparing.
 
-**Live stack:** FastAPI · PostgreSQL · pgvector · Airflow · dbt · BigQuery · Next.js · Claude AI · Railway · Prometheus
+**Live stack:** FastAPI · PostgreSQL · pgvector · Claude AI · Chrome Extension · Railway
 
 ---
 
-## What's Been Built
+## What It Does
 
-| Feature | Status |
-|---|---|
-| Job ingestion from Adzuna + JSearch (LinkedIn/Indeed) | ✅ Live — 650+ jobs/run |
-| Bay Area + USA geo filtering | ✅ Live |
-| Deduplication across sources | ✅ Live |
-| Resume embedding + job scoring (cosine similarity, 0–100%) | ✅ Live |
-| Cover letter generation (Claude AI, per job) | ✅ Live |
-| Daily email digest of top matches | ✅ Live |
-| Autofill script (Workday, Greenhouse, Lever, Ashby, Uber) | ✅ Live — [see autofill/](autofill/) |
-| Application tracker (Kanban board) | 🔄 Phase 5 |
-| Analytics dashboard (Next.js) | 🔄 Phase 5 |
-| BigQuery warehouse + dbt models | 🔄 Phase 4 |
-| Browser extension (replace console script) | 🔄 Phase 6 |
-| ATS type detection in email notification | 🔄 Phase 6 |
-| Profile Clipboard UI (click-to-copy all 35 fields) | 🔄 Phase 6 |
+```
+Job APIs (Adzuna + JSearch)
+        │
+        ▼
+Ingestion + Deduplication (650+ jobs/run)
+        │
+        ▼
+Resume Embedding + Cosine Similarity Scoring
+        │
+        ▼
+Cover Letter + "Why You Fit" — generated per job, per resume
+        │
+        ▼
+Daily Email Digest — top 50 matches, grouped by ATS platform
+        │
+        ▼
+One click → Company ATS directly (no Dice, no LinkedIn, no middlemen)
+        │
+        ▼
+Chrome Extension — autofills 40+ fields in one click
+        │
+        ▼
+You review, fix anything missed, submit
+```
+
+No auto-submit. No bots. You stay in control of every submission.
+
+---
+
+## Shipped Features
+
+| Feature | Status | Detail |
+|---|---|---|
+| Job ingestion — Adzuna + JSearch | ✅ Live | 650+ jobs/run, deduped across sources |
+| Bay Area + USA geo filtering | ✅ Live | City-by-city targeting |
+| Resume embedding + job scoring | ✅ Live | Cosine similarity, 0–100% match |
+| Cover letter generation | ✅ Live | Claude AI, tailored per job |
+| "Why You Fit" summary | ✅ Live | One sentence, top of each card |
+| Daily email digest — top 50 | ✅ Live | Grouped by ATS platform |
+| Dual apply buttons | ✅ Live | "Apply Now" (original API link) + "Find Direct Link" (Google search: Role at Company) |
+| ATS platform detection + grouping | ✅ Live | Greenhouse · Lever · Workday · Uber · Ashby · iCIMS · more |
+| Chrome extension autofill | ✅ Live | 40+ fields, one click, CSP-proof |
+| Uber Careers — full form | ✅ Live | Work history, education, EEO, months/years |
+| Greenhouse — full form | ✅ Live | Label-based, works on any company using Greenhouse |
+| Lever, Ashby, Workday | ✅ Live | Name, contact, LinkedIn, cover letter |
+
+---
+
+## The Email Digest
+
+Each morning you receive one email containing your top 50 matches. Jobs are grouped by ATS platform so you can batch-apply platform by platform without context switching.
+
+Each card contains:
+- **Role + company + location + salary range**
+- **Match % badge** — scored against your resume
+- **Why You Fit** — one sentence, pre-written
+- **Cover letter** — ready to copy and paste
+- **Apply Now** (blue) — original job board link from the API, one click to the listing
+- **Find Direct Link** (orange) — Google search pre-filled with `Role at Company`, lands on the company's own ATS in one click
+
+Target: **1 hour, 20 applications submitted.**
+
+---
+
+## The Chrome Extension
+
+After clicking Apply, the JobRadar extension fills the entire form with one click.
+
+**How it works:**
+1. Open job application page
+2. Upload your resume — wait 2–3 seconds for their parser to run
+3. Copy your cover letter from the email
+4. Click the green **JobRadar** icon → **⚡ Fill This Form**
+5. Review, fix anything missed, submit
+
+**What it fills:** Name, contact, location, LinkedIn, work history (4 jobs + dates), education, EEO fields (race, disability, veteran status), cover letter from clipboard.
+
+**Why it beats Simplify Copilot:**
+
+| | JobRadar Extension | Simplify Copilot |
+|---|---|---|
+| CSP-proof (Uber, others) | ✅ | ✅ |
+| EEO fields | ✅ Fully filled | ❌ Usually skipped |
+| Work history (multiple jobs + dates) | ✅ All 4 jobs | ❌ Not supported |
+| Cover letter auto-paste | ✅ From clipboard | ❌ Not supported |
+| Privacy | ✅ Runs locally | ❌ Resume sent to servers |
+| Cost | ✅ Free | ❌ $8–30/month |
+
+---
+
+## Supported ATS Platforms
+
+| Platform | Status | Fields |
+|---|---|---|
+| Uber (`uber.com/careers`) | ✅ Production | 42 — full form |
+| Greenhouse (`greenhouse.io`) | ✅ Production | 20+ — any company using Greenhouse |
+| Lever (`jobs.lever.co`) | ✅ Production | Name, contact, LinkedIn, EEO |
+| Ashby (`ashbyhq.com`) | ✅ Production | Name, contact, LinkedIn |
+| Workday (`myworkday.com`) | ✅ Production | Name, contact, city, zip, cover letter |
+| LinkedIn Easy Apply | 🔜 Next | |
+| iCIMS | 🔜 Next | |
+| SmartRecruiters | 🔜 Next | |
 
 ---
 
@@ -34,8 +121,8 @@ A multi-agent AI platform that automates the full job search pipeline — from d
 ┌─────────────────────────────────────────────────────┐
 │                  INGESTION LAYER                    │
 │  Adzuna API ──┐                                     │
-│               ├──► Airflow DAG ──► PostgreSQL       │
-│  JSearch API ─┘    (every 6h)      + pgvector       │
+│               ├──► PostgreSQL + pgvector            │
+│  JSearch API ─┘    (URL resolution at ingest)       │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
@@ -43,22 +130,22 @@ A multi-agent AI platform that automates the full job search pipeline — from d
 │  Orchestrator (Claude Sonnet)                       │
 │    ├── Scraper Agent   — fetch + deduplicate        │
 │    ├── Matcher Agent   — embed + score vs resume    │
-│    ├── Writer Agent    — cover letters + bullets    │
+│    ├── Writer Agent    — cover letters + summaries  │
 │    └── Notifier Agent  — daily email digest         │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
 │                  DATA LAYER                         │
 │  PostgreSQL (operational) + pgvector (embeddings)   │
-│  BigQuery (analytics warehouse) — planned           │
-│  dbt (staging → marts → reports) — planned          │
+│  5-day rolling window — jobs older than 5 days      │
+│  are purged daily                                   │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
-│                FRONTEND LAYER                       │
-│  Next.js 14 — Dashboard · Jobs · Tracker            │
-│  FastAPI — REST API                                 │
-│  Prometheus + Grafana — monitoring                  │
+│               APPLICATION LAYER                     │
+│  Chrome Extension (Manifest V3)                     │
+│  content_script.js — injected at browser level      │
+│  CSP-proof: no page can block it                    │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -71,14 +158,10 @@ A multi-agent AI platform that automates the full job search pipeline — from d
 | Backend | FastAPI, Python 3.12 |
 | Database | PostgreSQL 16, pgvector |
 | Job APIs | Adzuna, JSearch (RapidAPI) |
-| AI / Agents | Claude Sonnet (orchestrator), Claude Haiku (matching, writing) |
-| Embeddings | pgvector + text-embedding-3-small |
-| Orchestration | Apache Airflow |
-| Warehouse | BigQuery + dbt (planned) |
-| Frontend | Next.js 14, Tailwind CSS |
-| Infrastructure | Docker, Railway, GitHub Actions |
-| Monitoring | Prometheus, Grafana |
-| Notifications | SendGrid |
+| AI / Agents | Claude Sonnet (orchestrator + writer), text-embedding-3-small |
+| Browser Extension | Chrome Manifest V3, content scripts |
+| Infrastructure | Docker, Railway |
+| Notifications | Gmail SMTP |
 
 ---
 
@@ -90,24 +173,20 @@ jobradar/
 │   ├── app/
 │   │   ├── agents/          # orchestrator, scraper, matcher, writer, notifier
 │   │   ├── core/            # config, database connection
-│   │   ├── models/          # SQLAlchemy models
-│   │   └── services/        # adzuna.py, jsearch.py, ingest.py
+│   │   ├── models/          # SQLAlchemy models (Job, Resume)
+│   │   └── services/        # adzuna.py, jsearch.py, ingest.py, match.py,
+│   │                        # notify.py, embed.py, writer.py
+│   ├── score.py             # run scoring + send digest (daily entrypoint)
+│   ├── cleanup.py           # purge jobs older than 5 days
 │   └── requirements.txt
-├── airflow/
-│   └── dags/                # 5 DAGs: ingestion, matching, prep, digest, dbt
+├── extension/
+│   ├── manifest.json        # Chrome Manifest V3
+│   ├── content_script.js    # autofill logic — all ATS platforms
+│   ├── popup.html           # extension UI
+│   └── popup.js             # message passing + fallback injection
 ├── autofill/
-│   ├── autofill.js          # ATS autofill script (Workday, Greenhouse, Lever, Ashby, Uber)
-│   ├── uber-snippet.min.js  # Minified version for Safari snippets
-│   └── README.md            # Setup guide + roadmap
-├── dbt/
-│   └── models/              # staging, marts, reports
-├── frontend/
-│   └── app/                 # Next.js 14 app router
-├── monitoring/
-│   ├── prometheus.yml
-│   └── grafana/
-├── docker-compose.yml
-└── .github/workflows/ci.yml
+│   └── README.md            # technical reference for adding new ATS platforms
+└── README.md
 ```
 
 ---
@@ -115,24 +194,11 @@ jobradar/
 ## Database Schema
 
 ```sql
--- Jobs ingested from APIs
 jobs (id, external_id, source, title, company, location, remote,
       bay_area, description, url, salary_min, salary_max,
       posted_at, ingested_at, raw)
 
--- Resume versions
 resumes (id, version, content, embedding, created_at)
-
--- Match scores
-matches (id, job_id, resume_id, score, matched_at, match_reasons)
-
--- Application tracking
-applications (id, job_id, status, cover_letter, tailored_bullets,
-              applied_at, notes, contact_name, follow_up_date)
-
--- Agent run logs
-agent_runs (id, agent_name, status, jobs_fetched, jobs_matched,
-            errors, started_at, completed_at)
 ```
 
 ---
@@ -140,63 +206,32 @@ agent_runs (id, agent_name, status, jobs_fetched, jobs_matched,
 ## Quickstart
 
 ```bash
-# 1. Clone and configure
 git clone https://github.com/ahmadavar/jobradar.git
-cd jobradar
-cp .env.example .env
-# Fill in API keys in .env
+cd jobradar/backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-# 2. Start infrastructure
-docker compose up -d
+# configure .env with API keys (see .env.example)
 
-# 3. Install dependencies
-cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-
-# 4. Create tables
-.venv/bin/python3 -c "
-from app.core.database import Base, engine
-from app.models.jobs import Job
-Base.metadata.create_all(bind=engine)
-"
-
-# 5. Run first ingestion
+# run ingestion
 .venv/bin/python3 -m app.services.ingest
+
+# score + send digest
+.venv/bin/python3 score.py
+
+# daily cleanup
+.venv/bin/python3 cleanup.py
 ```
 
----
-
-## Build Phases
-
-| Phase | Description | Status |
-|---|---|---|
-| 1 — Data Foundation | PostgreSQL schema, Adzuna + JSearch APIs, ingestion pipeline | ✅ Complete |
-| 2 — Matching Engine | Resume embedding, job scoring, cosine similarity | ✅ Complete |
-| 3 — Agent Layer | 5 agents: Orchestrator, Scraper, Matcher, Writer, Notifier | ✅ Complete |
-| 4 — dbt + BigQuery | Analytics warehouse, staging + mart models | 🔄 Planned |
-| 5 — Frontend | Dashboard, job list, application kanban, analytics | 🔄 Planned |
-| 6 — Application Submission | Browser extension, ATS detection, Profile Clipboard UI | 🔄 Planned |
+**Chrome extension:** `chrome://extensions` → Developer mode ON → Load unpacked → select `extension/`
 
 ---
 
-## Data Sources
+## What's Not Included by Design
 
-| API | Coverage | Cost | Limit |
-|---|---|---|---|
-| Adzuna | USA, city-by-city Bay Area | Free | 250 calls/day |
-| JSearch (RapidAPI) | LinkedIn + Indeed + Glassdoor | Free tier | 200 req/month |
-
-Current ingestion: **650+ unique jobs per run**, **370+ Bay Area jobs**, last 15 days only.
+- **Auto-submit** — ATS platforms actively block bots; legal and ethical risk
+- **Interview scheduling** — requires human judgment
+- **Resume generation** — you know your own story better than any model
 
 ---
-
-## Why This Project
-
-Built to solve a real problem: automating the repetitive parts of a job search while keeping humans in control of the decisions that matter.
-
-The pipeline handles discovery → scoring → writing → delivery. The remaining bottleneck — filling out ATS application forms — is addressed in [autofill/](autofill/) with a current script-based approach and a roadmap toward a full browser extension.
-
-**NOT included by design:**
-- Auto-submit (ATS platforms actively block bots, legal/ethical risk)
-- Interview scheduling (requires human judgment)
 
 *Built by Ahmad Naggayev — [linkedin.com/in/ahmadnaggayev](https://linkedin.com/in/ahmadnaggayev)*
